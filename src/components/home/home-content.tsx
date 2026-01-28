@@ -15,13 +15,17 @@ import {
   Clock,
   LayoutGrid,
   List,
+  Loader2,
 } from "lucide-react";
-import { datasets, searchDatasets, formatNumber } from "@/data/datasets";
+import { Dataset } from "@/types/dataset";
+import { formatNumber } from "@/data/datasets";
 
 export function HomeContent() {
   const searchParams = useSearchParams();
   const initialQuery = searchParams.get("q") || "";
 
+  const [datasets, setDatasets] = useState<Dataset[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [selectedTask, setSelectedTask] = useState("");
   const [selectedFormat, setSelectedFormat] = useState("");
@@ -32,19 +36,49 @@ export function HomeContent() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   useEffect(() => {
+    const fetchDatasets = async () => {
+      try {
+        const res = await fetch("/api/datasets");
+        const data = await res.json();
+        setDatasets(data);
+      } catch (error) {
+        console.error("Failed to fetch datasets:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDatasets();
+  }, []);
+
+  useEffect(() => {
     setSearchQuery(initialQuery);
   }, [initialQuery]);
 
   const filteredDatasets = useMemo(() => {
-    let results = searchDatasets(searchQuery, {
-      task: selectedTask && selectedTask !== "all" ? selectedTask : undefined,
-      format:
-        selectedFormat && selectedFormat !== "all" ? selectedFormat : undefined,
-      license:
-        selectedLicense && selectedLicense !== "all"
-          ? selectedLicense
-          : undefined,
-    });
+    let results = datasets;
+
+    // Search
+    if (searchQuery) {
+      const lowerQuery = searchQuery.toLowerCase();
+      results = results.filter(
+        (d) =>
+          d.name.toLowerCase().includes(lowerQuery) ||
+          d.description.toLowerCase().includes(lowerQuery) ||
+          d.tags.some((t) => t.toLowerCase().includes(lowerQuery)) ||
+          d.author.toLowerCase().includes(lowerQuery)
+      );
+    }
+
+    // Filters
+    if (selectedTask && selectedTask !== "all") {
+      results = results.filter((d) => d.task === selectedTask);
+    }
+    if (selectedFormat && selectedFormat !== "all") {
+      results = results.filter((d) => d.format === selectedFormat);
+    }
+    if (selectedLicense && selectedLicense !== "all") {
+      results = results.filter((d) => d.license === selectedLicense);
+    }
 
     // Sort
     if (sortBy === "downloads") {
@@ -62,7 +96,7 @@ export function HomeContent() {
     }
 
     return results;
-  }, [searchQuery, selectedTask, selectedFormat, selectedLicense, sortBy]);
+  }, [datasets, searchQuery, selectedTask, selectedFormat, selectedLicense, sortBy]);
 
   const clearFilters = () => {
     setSelectedTask("");
@@ -72,6 +106,14 @@ export function HomeContent() {
 
   const totalDownloads = datasets.reduce((sum, d) => sum + d.downloads, 0);
   const totalRows = datasets.reduce((sum, d) => sum + (d.rows || 0), 0);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">

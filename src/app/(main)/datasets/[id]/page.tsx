@@ -1,20 +1,29 @@
 import { notFound } from "next/navigation";
-import { getDatasetById, datasets, formatNumber } from "@/data/datasets";
 import { DatasetDetailClient } from "./dataset-detail-client";
 
 interface DatasetPageProps {
   params: Promise<{ id: string }>;
 }
 
-export async function generateStaticParams() {
-  return datasets.map((dataset) => ({
-    id: dataset.id,
-  }));
+async function getDataset(id: string) {
+  // In production, use absolute URL or environment variable
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3001";
+  
+  try {
+    const res = await fetch(`${baseUrl}/api/datasets/${id}`, {
+      cache: "no-store",
+    });
+    
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
 }
 
 export async function generateMetadata({ params }: DatasetPageProps) {
   const { id } = await params;
-  const dataset = getDatasetById(id);
+  const dataset = await getDataset(id);
 
   if (!dataset) {
     return {
@@ -30,7 +39,7 @@ export async function generateMetadata({ params }: DatasetPageProps) {
 
 export default async function DatasetPage({ params }: DatasetPageProps) {
   const { id } = await params;
-  const dataset = getDatasetById(id);
+  const dataset = await getDataset(id);
 
   if (!dataset) {
     notFound();

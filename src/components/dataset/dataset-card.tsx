@@ -42,19 +42,19 @@ export function DatasetCard({ dataset }: DatasetCardProps) {
           </p>
 
           {/* Tags */}
-          <div className="flex flex-wrap gap-1 mb-3">
-            {dataset.tags.slice(0, 3).map((tag) => (
+          <div className="flex gap-1 mb-3">
+            {dataset.tags.slice(0, 2).map((tag) => (
               <Badge
                 key={tag}
                 variant="outline"
-                className="text-xs px-2 py-0 h-5"
+                className="text-xs px-2 py-0 h-5 truncate max-w-24"
               >
                 {tag}
               </Badge>
             ))}
-            {dataset.tags.length > 3 && (
-              <Badge variant="outline" className="text-xs px-2 py-0 h-5">
-                +{dataset.tags.length - 3}
+            {dataset.tags.length > 2 && (
+              <Badge variant="outline" className="text-xs px-2 py-0 h-5 flex-shrink-0">
+                +{dataset.tags.length - 2}
               </Badge>
             )}
           </div>
