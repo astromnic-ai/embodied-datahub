@@ -227,7 +227,7 @@ export async function updateDataset(
 
 export async function deleteDataset(id: string): Promise<boolean> {
   const result = await sql`
-    DELETE FROM datasets WHERE id = ${id}
+    DELETE FROM datasets WHERE id = ${id} RETURNING id
   `;
-  return result.count > 0;
+  return result.length > 0;
 }
