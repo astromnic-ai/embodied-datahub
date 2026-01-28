@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthenticated } from "@/lib/auth";
-import { getAllDatasets, createDataset } from "@/lib/dataset-store";
+import { getAllDatasets, createDataset } from "@/db/datasets";
 
 export async function GET() {
-  const datasets = getAllDatasets();
-  return NextResponse.json(datasets);
+  try {
+    const datasets = await getAllDatasets();
+    return NextResponse.json(datasets);
+  } catch (error) {
+    console.error("Failed to fetch datasets:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch datasets" },
+      { status: 500 }
+    );
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -15,7 +23,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const data = await request.json();
-    
+
     // Validate required fields
     if (!data.name || !data.author || !data.description) {
       return NextResponse.json(
@@ -24,7 +32,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const dataset = createDataset({
+    const dataset = await createDataset({
       name: data.name,
       author: data.author,
       description: data.description,
@@ -44,9 +52,10 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(dataset, { status: 201 });
-  } catch {
+  } catch (error) {
+    console.error("Failed to create dataset:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Failed to create dataset" },
       { status: 500 }
     );
   }

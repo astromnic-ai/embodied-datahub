@@ -1,19 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthenticated } from "@/lib/auth";
-import { getDatasetById, updateDataset, deleteDataset } from "@/lib/dataset-store";
+import { getDatasetById, updateDataset, deleteDataset } from "@/db/datasets";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const dataset = getDatasetById(id);
-  
-  if (!dataset) {
-    return NextResponse.json({ error: "Dataset not found" }, { status: 404 });
+
+  try {
+    const dataset = await getDatasetById(id);
+
+    if (!dataset) {
+      return NextResponse.json({ error: "Dataset not found" }, { status: 404 });
+    }
+
+    return NextResponse.json(dataset);
+  } catch (error) {
+    console.error("Failed to fetch dataset:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch dataset" },
+      { status: 500 }
+    );
   }
-  
-  return NextResponse.json(dataset);
 }
 
 export async function PUT(
@@ -26,22 +35,23 @@ export async function PUT(
   }
 
   const { id } = await params;
-  
+
   try {
     const data = await request.json();
-    const updated = updateDataset(id, {
+    const updated = await updateDataset(id, {
       ...data,
       updatedAt: new Date().toISOString().split("T")[0],
     });
-    
+
     if (!updated) {
       return NextResponse.json({ error: "Dataset not found" }, { status: 404 });
     }
-    
+
     return NextResponse.json(updated);
-  } catch {
+  } catch (error) {
+    console.error("Failed to update dataset:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Failed to update dataset" },
       { status: 500 }
     );
   }
@@ -57,11 +67,20 @@ export async function DELETE(
   }
 
   const { id } = await params;
-  const deleted = deleteDataset(id);
-  
-  if (!deleted) {
-    return NextResponse.json({ error: "Dataset not found" }, { status: 404 });
+
+  try {
+    const deleted = await deleteDataset(id);
+
+    if (!deleted) {
+      return NextResponse.json({ error: "Dataset not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Failed to delete dataset:", error);
+    return NextResponse.json(
+      { error: "Failed to delete dataset" },
+      { status: 500 }
+    );
   }
-  
-  return NextResponse.json({ success: true });
 }

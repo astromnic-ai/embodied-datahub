@@ -47,7 +47,7 @@ export function DatasetCard({ dataset }: DatasetCardProps) {
               <Badge
                 key={tag}
                 variant="outline"
-                className="text-xs px-2 py-0 h-5 truncate max-w-24"
+                className="text-xs px-2 py-0 h-5"
               >
                 {tag}
               </Badge>
