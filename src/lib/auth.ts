@@ -1,5 +1,5 @@
 import { SignJWT, jwtVerify } from "jose";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 
 const secretKey = process.env.SESSION_SECRET || "default-secret-key";
 const key = new TextEncoder().encode(secretKey);
@@ -40,10 +40,10 @@ export async function login(username: string, password: string) {
       path: "/",
     });
 
-    return true;
+    return session; // Return token for CLI usage
   }
 
-  return false;
+  return null;
 }
 
 export async function logout() {
@@ -52,6 +52,16 @@ export async function logout() {
 }
 
 export async function getSession() {
+  // First, try to get token from Authorization header (for CLI)
+  const headersList = await headers();
+  const authHeader = headersList.get("authorization");
+  
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.slice(7);
+    return await decrypt(token);
+  }
+  
+  // Fall back to cookie-based session (for web)
   const cookieStore = await cookies();
   const session = cookieStore.get("session")?.value;
   if (!session) return null;

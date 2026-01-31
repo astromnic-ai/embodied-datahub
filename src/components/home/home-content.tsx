@@ -16,6 +16,7 @@ import {
   LayoutGrid,
   List,
   Loader2,
+  Film,
 } from "lucide-react";
 import { Dataset } from "@/types/dataset";
 import { formatNumber } from "@/data/datasets";
@@ -27,8 +28,9 @@ export function HomeContent() {
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState(initialQuery);
-  const [selectedTask, setSelectedTask] = useState("");
   const [selectedFormat, setSelectedFormat] = useState("");
+  const [selectedRobotType, setSelectedRobotType] = useState("");
+  const [selectedTaskType, setSelectedTaskType] = useState("");
   const [selectedLicense, setSelectedLicense] = useState("");
   const [sortBy, setSortBy] = useState<"trending" | "recent" | "downloads">(
     "trending"
@@ -65,16 +67,21 @@ export function HomeContent() {
           d.name.toLowerCase().includes(lowerQuery) ||
           d.description.toLowerCase().includes(lowerQuery) ||
           d.tags.some((t) => t.toLowerCase().includes(lowerQuery)) ||
-          d.author.toLowerCase().includes(lowerQuery)
+          d.author.toLowerCase().includes(lowerQuery) ||
+          d.robotType?.toLowerCase().includes(lowerQuery) ||
+          d.taskType?.toLowerCase().includes(lowerQuery)
       );
     }
 
     // Filters
-    if (selectedTask && selectedTask !== "all") {
-      results = results.filter((d) => d.task === selectedTask);
-    }
     if (selectedFormat && selectedFormat !== "all") {
-      results = results.filter((d) => d.format === selectedFormat);
+      results = results.filter((d) => d.datasetFormat === selectedFormat);
+    }
+    if (selectedRobotType && selectedRobotType !== "all") {
+      results = results.filter((d) => d.robotType === selectedRobotType);
+    }
+    if (selectedTaskType && selectedTaskType !== "all") {
+      results = results.filter((d) => d.taskType === selectedTaskType);
     }
     if (selectedLicense && selectedLicense !== "all") {
       results = results.filter((d) => d.license === selectedLicense);
@@ -89,23 +96,22 @@ export function HomeContent() {
           new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
       );
     } else {
-      // trending: mix of downloads and likes
-      results = [...results].sort(
-        (a, b) => b.downloads + b.likes * 10 - (a.downloads + a.likes * 10)
-      );
+      // trending: by downloads
+      results = [...results].sort((a, b) => b.downloads - a.downloads);
     }
 
     return results;
-  }, [datasets, searchQuery, selectedTask, selectedFormat, selectedLicense, sortBy]);
+  }, [datasets, searchQuery, selectedFormat, selectedRobotType, selectedTaskType, selectedLicense, sortBy]);
 
   const clearFilters = () => {
-    setSelectedTask("");
     setSelectedFormat("");
+    setSelectedRobotType("");
+    setSelectedTaskType("");
     setSelectedLicense("");
   };
 
   const totalDownloads = datasets.reduce((sum, d) => sum + d.downloads, 0);
-  const totalRows = datasets.reduce((sum, d) => sum + (d.rows || 0), 0);
+  const totalEpisodes = datasets.reduce((sum, d) => sum + (d.totalEpisodes || 0), 0);
 
   if (loading) {
     return (
@@ -125,8 +131,8 @@ export function HomeContent() {
               Embodied AI Datasets
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Discover, share, and collaborate on datasets for robotics,
-              embodied AI, and autonomous systems research.
+              Discover and share LeRobot & Corobot format datasets for robotics
+              imitation learning and manipulation research.
             </p>
           </div>
 
@@ -136,7 +142,7 @@ export function HomeContent() {
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
                 type="search"
-                placeholder="Search datasets by name, task, or keyword..."
+                placeholder="Search by name, robot type, task, or keyword..."
                 className="pl-12 h-12 text-base"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -155,22 +161,22 @@ export function HomeContent() {
             </div>
             <Separator orientation="vertical" className="h-4" />
             <div className="flex items-center gap-2">
+              <Film className="h-4 w-4" />
+              <span>
+                <strong className="text-foreground">
+                  {formatNumber(totalEpisodes)}
+                </strong>{" "}
+                Episodes
+              </span>
+            </div>
+            <Separator orientation="vertical" className="h-4" />
+            <div className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
               <span>
                 <strong className="text-foreground">
                   {formatNumber(totalDownloads)}
                 </strong>{" "}
                 Downloads
-              </span>
-            </div>
-            <Separator orientation="vertical" className="h-4" />
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              <span>
-                <strong className="text-foreground">
-                  {formatNumber(totalRows)}
-                </strong>{" "}
-                Rows
               </span>
             </div>
           </div>
@@ -183,11 +189,13 @@ export function HomeContent() {
           {/* Filters & Sort */}
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
             <SearchFilters
-              selectedTask={selectedTask}
               selectedFormat={selectedFormat}
+              selectedRobotType={selectedRobotType}
+              selectedTaskType={selectedTaskType}
               selectedLicense={selectedLicense}
-              onTaskChange={setSelectedTask}
               onFormatChange={setSelectedFormat}
+              onRobotTypeChange={setSelectedRobotType}
+              onTaskTypeChange={setSelectedTaskType}
               onLicenseChange={setSelectedLicense}
               onClearFilters={clearFilters}
             />

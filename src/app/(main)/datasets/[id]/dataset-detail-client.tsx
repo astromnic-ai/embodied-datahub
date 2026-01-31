@@ -7,26 +7,33 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Download,
-  Heart,
-  Share2,
   Copy,
   ChevronLeft,
   Database,
-  FileText,
   Code2,
-  Table2,
-  GitBranch,
   Calendar,
   HardDrive,
   Scale,
-  ExternalLink,
   Check,
+  Film,
+  Layers,
+  Gauge,
+  Bot,
+  Target,
+  Eye,
+  Zap,
+  Box,
+  FileText,
+  BookOpen,
+  Terminal,
 } from "lucide-react";
 import { Dataset } from "@/types/dataset";
 import { formatNumber } from "@/data/datasets";
+import { FilePreview } from "@/components/dataset/file-preview";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { useState } from "react";
 
 interface DatasetDetailClientProps {
@@ -34,32 +41,52 @@ interface DatasetDetailClientProps {
 }
 
 export function DatasetDetailClient({ dataset }: DatasetDetailClientProps) {
-  const [copied, setCopied] = useState(false);
-  const [liked, setLiked] = useState(false);
+  const [copiedText, setCopiedText] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("overview");
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopiedText(text);
+    setTimeout(() => setCopiedText(null), 2000);
   };
 
-  const pythonCode = `from datasets import load_dataset
+  const isCopied = (text: string) => copiedText === text;
+
+  const handleDownloadClick = () => {
+    setActiveTab("code");
+    // Wait for tab content to render, then scroll to CLI section
+    setTimeout(() => {
+      const cliSection = document.getElementById("cli-download");
+      if (cliSection) {
+        cliSection.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }, 100);
+  };
+
+  const pythonCode = `from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
 
 # Load the dataset
+dataset = LeRobotDataset("embodied-datahub/${dataset.id}")
+
+# Access episode data
+episode = dataset[0]
+print(f"Episode keys: {episode.keys()}")
+
+# Iterate through frames
+for i in range(len(dataset)):
+    frame = dataset[i]
+    observation = frame["observation.state"]
+    action = frame["action"]
+    print(f"Frame {i}: obs shape {observation.shape}, action shape {action.shape}")`;
+
+  const huggingfaceCode = `from datasets import load_dataset
+
+# Load from Hugging Face Hub
 dataset = load_dataset("embodied-datahub/${dataset.id}")
 
-# Access the train split
+# Access train split
 train_data = dataset["train"]
-
-# Iterate through examples
-for example in train_data:
-    print(example)`;
-
-  const cliCode = `# Install the datasets library
-pip install datasets
-
-# Download using CLI
-datasets-cli download embodied-datahub/${dataset.id}`;
+print(f"Number of episodes: {len(train_data)}")`;
 
   return (
     <div className="min-h-screen bg-background">
@@ -101,11 +128,15 @@ datasets-cli download embodied-datahub/${dataset.id}`;
                 {dataset.description}
               </p>
 
-              {/* Tags */}
+              {/* Format & Robot & Task Badges */}
               <div className="flex flex-wrap gap-2 mb-4">
-                <Badge>{dataset.task}</Badge>
+                <Badge variant={dataset.datasetFormat === "lerobot" ? "default" : "secondary"}>
+                  {dataset.datasetFormat === "lerobot" ? "LeRobot" : "Corobot"}
+                </Badge>
+                <Badge variant="outline">{dataset.robotType}</Badge>
+                <Badge variant="outline">{dataset.taskType}</Badge>
                 {dataset.tags.map((tag) => (
-                  <Badge key={tag} variant="outline">
+                  <Badge key={tag} variant="outline" className="bg-muted/50">
                     {tag}
                   </Badge>
                 ))}
@@ -114,41 +145,26 @@ datasets-cli download embodied-datahub/${dataset.id}`;
               {/* Stats */}
               <div className="flex items-center gap-6 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1">
+                  <Film className="h-4 w-4" />
+                  {formatNumber(dataset.totalEpisodes)} episodes
+                </span>
+                <span className="flex items-center gap-1">
+                  <Layers className="h-4 w-4" />
+                  {formatNumber(dataset.totalFrames)} frames
+                </span>
+                <span className="flex items-center gap-1">
                   <Download className="h-4 w-4" />
                   {formatNumber(dataset.downloads)} downloads
-                </span>
-                <span className="flex items-center gap-1">
-                  <Heart className="h-4 w-4" />
-                  {formatNumber(dataset.likes)} likes
-                </span>
-                <span className="flex items-center gap-1">
-                  <Calendar className="h-4 w-4" />
-                  Updated {dataset.updatedAt}
                 </span>
               </div>
             </div>
 
             {/* Actions */}
             <div className="flex flex-col gap-2">
-              <Button className="gap-2">
+              <Button className="gap-2" onClick={handleDownloadClick}>
                 <Download className="h-4 w-4" />
                 Download Dataset
               </Button>
-              <div className="flex gap-2">
-                <Button
-                  variant={liked ? "secondary" : "outline"}
-                  className="flex-1 gap-2"
-                  onClick={() => setLiked(!liked)}
-                >
-                  <Heart
-                    className={`h-4 w-4 ${liked ? "fill-current text-red-500" : ""}`}
-                  />
-                  {liked ? "Liked" : "Like"}
-                </Button>
-                <Button variant="outline" size="icon">
-                  <Share2 className="h-4 w-4" />
-                </Button>
-              </div>
             </div>
           </div>
         </div>
@@ -159,120 +175,318 @@ datasets-cli download embodied-datahub/${dataset.id}`;
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column - Main Content */}
           <div className="lg:col-span-2">
-            <Tabs defaultValue="dataset" className="w-full">
-              <TabsList className="w-full justify-start mb-6">
-                <TabsTrigger value="dataset" className="gap-2">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="w-full justify-start mb-6 flex-wrap">
+                <TabsTrigger value="overview" className="gap-2">
                   <Database className="h-4 w-4" />
-                  Dataset Card
-                </TabsTrigger>
-                <TabsTrigger value="viewer" className="gap-2">
-                  <Table2 className="h-4 w-4" />
-                  Viewer
-                </TabsTrigger>
-                <TabsTrigger value="code" className="gap-2">
-                  <Code2 className="h-4 w-4" />
-                  Use Dataset
+                  Overview
                 </TabsTrigger>
                 <TabsTrigger value="files" className="gap-2">
                   <FileText className="h-4 w-4" />
                   Files
                 </TabsTrigger>
+                <TabsTrigger value="code" className="gap-2">
+                  <Code2 className="h-4 w-4" />
+                  Use Dataset
+                </TabsTrigger>
               </TabsList>
 
-              {/* Dataset Card Tab */}
-              <TabsContent value="dataset" className="space-y-6">
+              {/* Overview Tab */}
+              <TabsContent value="overview" className="space-y-6">
+                {dataset.readme && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <BookOpen className="h-5 w-5" />
+                        README
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-sm">
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            h1: ({ children }) => (
+                              <h1 className="text-2xl font-bold mt-6 mb-4 pb-2 border-b">
+                                {children}
+                              </h1>
+                            ),
+                            h2: ({ children }) => (
+                              <h2 className="text-xl font-bold mt-5 mb-3">
+                                {children}
+                              </h2>
+                            ),
+                            h3: ({ children }) => (
+                              <h3 className="text-lg font-semibold mt-4 mb-2">
+                                {children}
+                              </h3>
+                            ),
+                            h4: ({ children }) => (
+                              <h4 className="text-base font-semibold mt-3 mb-2">
+                                {children}
+                              </h4>
+                            ),
+                            p: ({ children }) => (
+                              <p className="my-3 leading-relaxed">{children}</p>
+                            ),
+                            ul: ({ children }) => (
+                              <ul className="my-3 ml-6 list-disc space-y-1">
+                                {children}
+                              </ul>
+                            ),
+                            ol: ({ children }) => (
+                              <ol className="my-3 ml-6 list-decimal space-y-1">
+                                {children}
+                              </ol>
+                            ),
+                            li: ({ children }) => (
+                              <li className="leading-relaxed">{children}</li>
+                            ),
+                            a: ({ href, children }) => (
+                              <a
+                                href={href}
+                                className="text-primary underline hover:no-underline"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                {children}
+                              </a>
+                            ),
+                            code: ({ className, children, ...props }) => {
+                              const isInline = !className;
+                              if (isInline) {
+                                return (
+                                  <code
+                                    className="px-1.5 py-0.5 rounded bg-muted text-sm font-mono"
+                                    {...props}
+                                  >
+                                    {children}
+                                  </code>
+                                );
+                              }
+                              return (
+                                <code className={className} {...props}>
+                                  {children}
+                                </code>
+                              );
+                            },
+                            pre: ({ children }) => (
+                              <pre className="my-4 p-4 rounded-lg bg-muted overflow-x-auto text-sm">
+                                {children}
+                              </pre>
+                            ),
+                            blockquote: ({ children }) => (
+                              <blockquote className="my-4 pl-4 border-l-4 border-muted-foreground/30 text-muted-foreground italic">
+                                {children}
+                              </blockquote>
+                            ),
+                            table: ({ children }) => (
+                              <div className="my-4 overflow-x-auto">
+                                <table className="w-full border-collapse border border-border text-sm">
+                                  {children}
+                                </table>
+                              </div>
+                            ),
+                            thead: ({ children }) => (
+                              <thead className="bg-muted">{children}</thead>
+                            ),
+                            th: ({ children }) => (
+                              <th className="px-3 py-2 text-left font-semibold border border-border">
+                                {children}
+                              </th>
+                            ),
+                            td: ({ children }) => (
+                              <td className="px-3 py-2 border border-border">
+                                {children}
+                              </td>
+                            ),
+                            hr: () => <hr className="my-6 border-border" />,
+                            img: ({ src, alt }) => (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={src || ""}
+                                alt={alt || ""}
+                                className="my-4 max-w-full rounded-lg"
+                              />
+                            ),
+                          }}
+                        >
+                          {dataset.readme}
+                        </ReactMarkdown>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Observation Types */}
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">Dataset Summary</CardTitle>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Eye className="h-5 w-5" />
+                      Observation Space
+                    </CardTitle>
                   </CardHeader>
-                  <CardContent className="prose prose-sm max-w-none dark:prose-invert">
-                    <p>{dataset.description}</p>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {dataset.observationTypes?.map((obs, i) => (
+                        <div
+                          key={i}
+                          className="flex items-start justify-between p-3 rounded-lg bg-muted/50"
+                        >
+                          <div>
+                            <code className="text-sm font-medium">{obs.name}</code>
+                            {obs.description && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {obs.description}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {obs.shape && (
+                              <Badge variant="outline" className="text-xs font-mono">
+                                {obs.shape}
+                              </Badge>
+                            )}
+                            <Badge variant="secondary" className="text-xs capitalize">
+                              {obs.type}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
 
-                    <h4>Intended Use</h4>
-                    <p>
-                      This dataset is designed for research in {dataset.task.toLowerCase()} 
-                      tasks. It can be used for training and evaluating machine learning 
-                      models in embodied AI and robotics applications.
-                    </p>
-
-                    <h4>Dataset Structure</h4>
-                    <p>
-                      The dataset contains {formatNumber(dataset.rows || 0)} examples 
-                      split across {dataset.splits?.length || 0} data splits.
-                    </p>
-
-                    <h4>Citation</h4>
-                    <pre className="bg-muted p-4 rounded-lg text-xs overflow-x-auto">
-{`@dataset{${dataset.id.replace(/-/g, "_")},
-  title={${dataset.name}},
-  author={${dataset.author}},
-  year={2026},
-  publisher={Embodied DataHub}
-}`}
-                    </pre>
+                {/* Action Space */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Zap className="h-5 w-5" />
+                      Action Space
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-3 rounded-lg bg-muted/50">
+                        <p className="text-xs text-muted-foreground mb-1">Type</p>
+                        <p className="font-medium capitalize">{dataset.actionSpace?.type}</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-muted/50">
+                        <p className="text-xs text-muted-foreground mb-1">Dimensions</p>
+                        <p className="font-medium">{dataset.actionSpace?.dimensions}</p>
+                      </div>
+                    </div>
+                    {dataset.actionSpace?.description && (
+                      <p className="text-sm text-muted-foreground mt-3">
+                        {dataset.actionSpace.description}
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
 
-              {/* Viewer Tab */}
-              <TabsContent value="viewer" className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Table2 className="h-5 w-5" />
-                      Data Preview
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ScrollArea className="w-full">
-                      <div className="rounded-lg border">
-                        <table className="w-full text-sm">
-                          <thead className="bg-muted/50">
-                            <tr>
-                              {dataset.previewData &&
-                                Object.keys(dataset.previewData[0]).map(
-                                  (key) => (
-                                    <th
-                                      key={key}
-                                      className="px-4 py-3 text-left font-medium"
-                                    >
-                                      {key}
-                                    </th>
-                                  )
-                                )}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {dataset.previewData?.map((row, i) => (
-                              <tr key={i} className="border-t">
-                                {Object.values(row).map((value, j) => (
-                                  <td
-                                    key={j}
-                                    className="px-4 py-3 font-mono text-xs"
-                                  >
-                                    {String(value)}
-                                  </td>
-                                ))}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </ScrollArea>
-                    <p className="text-xs text-muted-foreground mt-4">
-                      Showing first 3 rows of {formatNumber(dataset.rows || 0)}{" "}
-                      total rows
-                    </p>
-                  </CardContent>
-                </Card>
+              {/* Files Tab */}
+              <TabsContent value="files" className="space-y-6">
+                <FilePreview files={dataset.files || []} datasetId={dataset.id} />
               </TabsContent>
 
               {/* Code Tab */}
               <TabsContent value="code" className="space-y-6">
+                {/* CLI Download */}
+                <Card id="cli-download">
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Terminal className="h-5 w-5" />
+                      Download with CLI
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      Use the DataHub CLI tool to download datasets directly to your local machine.
+                    </p>
+                    
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-sm font-medium mb-2">1. Install CLI</p>
+                        <div className="relative">
+                          <pre className="bg-muted p-3 rounded-lg text-sm overflow-x-auto">
+                            <code>pip install embodied_datahub_cli-0.1.0-py3-none-any.whl</code>
+                          </pre>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-1.5 right-1.5 h-7 w-7"
+                            onClick={() => copyToClipboard("pip install embodied_datahub_cli-0.1.0-py3-none-any.whl")}
+                          >
+                            {isCopied("pip install embodied_datahub_cli-0.1.0-py3-none-any.whl") ? (
+                              <Check className="h-3 w-3 text-green-500" />
+                            ) : (
+                              <Copy className="h-3 w-3" />
+                            )}
+                          </Button>
+                        </div>
+                        <a
+                          href="/downloads/embodied_datahub_cli-0.1.0-py3-none-any.whl"
+                          download
+                          className="inline-flex items-center gap-2 mt-2 text-sm text-primary hover:underline"
+                        >
+                          <Download className="h-4 w-4" />
+                          Download CLI Package (.whl)
+                        </a>
+                      </div>
+
+                      <div>
+                        <p className="text-sm font-medium mb-2">2. Configure API URL</p>
+                        <div className="relative">
+                          <pre className="bg-muted p-3 rounded-lg text-sm overflow-x-auto">
+                            <code>{`datahub config api ${typeof window !== 'undefined' ? window.location.origin : 'https://your-datahub-url.com'}`}</code>
+                          </pre>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-1.5 right-1.5 h-7 w-7"
+                            onClick={() => copyToClipboard(`datahub config api ${typeof window !== 'undefined' ? window.location.origin : 'https://your-datahub-url.com'}`)}
+                          >
+                            {copiedText?.startsWith("datahub config api") ? (
+                              <Check className="h-3 w-3 text-green-500" />
+                            ) : (
+                              <Copy className="h-3 w-3" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <p className="text-sm font-medium mb-2">3. Download Dataset</p>
+                        <div className="relative">
+                          <pre className="bg-muted p-3 rounded-lg text-sm overflow-x-auto">
+                            <code>{`datahub download ${dataset.id}`}</code>
+                          </pre>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-1.5 right-1.5 h-7 w-7"
+                            onClick={() => copyToClipboard(`datahub download ${dataset.id}`)}
+                          >
+                            {isCopied(`datahub download ${dataset.id}`) ? (
+                              <Check className="h-3 w-3 text-green-500" />
+                            ) : (
+                              <Copy className="h-3 w-3" />
+                            )}
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          No COS credentials required for public datasets.
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-lg">
-                      Load with Python
+                      Load with LeRobot
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -286,7 +500,7 @@ datasets-cli download embodied-datahub/${dataset.id}`;
                         className="absolute top-2 right-2"
                         onClick={() => copyToClipboard(pythonCode)}
                       >
-                        {copied ? (
+                        {isCopied(pythonCode) ? (
                           <Check className="h-4 w-4 text-green-500" />
                         ) : (
                           <Copy className="h-4 w-4" />
@@ -298,76 +512,25 @@ datasets-cli download embodied-datahub/${dataset.id}`;
 
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">Command Line</CardTitle>
+                    <CardTitle className="text-lg">Load with Hugging Face</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="relative">
                       <pre className="bg-muted p-4 rounded-lg text-sm overflow-x-auto">
-                        <code>{cliCode}</code>
+                        <code>{huggingfaceCode}</code>
                       </pre>
                       <Button
                         variant="ghost"
                         size="icon"
                         className="absolute top-2 right-2"
-                        onClick={() => copyToClipboard(cliCode)}
+                        onClick={() => copyToClipboard(huggingfaceCode)}
                       >
-                        {copied ? (
+                        {isCopied(huggingfaceCode) ? (
                           <Check className="h-4 w-4 text-green-500" />
                         ) : (
                           <Copy className="h-4 w-4" />
                         )}
                       </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* Files Tab */}
-              <TabsContent value="files" className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <GitBranch className="h-5 w-5" />
-                      Files and Versions
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {dataset.splits?.map((split) => (
-                        <div
-                          key={split.name}
-                          className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
-                        >
-                          <div className="flex items-center gap-3">
-                            <FileText className="h-4 w-4 text-muted-foreground" />
-                            <div>
-                              <p className="font-medium text-sm">
-                                {split.name}.{dataset.format}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {formatNumber(split.rows)} rows
-                              </p>
-                            </div>
-                          </div>
-                          <Button variant="ghost" size="sm">
-                            <Download className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                      <div className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors">
-                        <div className="flex items-center gap-3">
-                          <FileText className="h-4 w-4 text-muted-foreground" />
-                          <div>
-                            <p className="font-medium text-sm">README.md</p>
-                            <p className="text-xs text-muted-foreground">
-                              Documentation
-                            </p>
-                          </div>
-                        </div>
-                        <Button variant="ghost" size="sm">
-                          <ExternalLink className="h-4 w-4" />
-                        </Button>
-                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -385,18 +548,36 @@ datasets-cli download embodied-datahub/${dataset.id}`;
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground flex items-center gap-2">
-                    <HardDrive className="h-4 w-4" />
-                    Size
+                    <Box className="h-4 w-4" />
+                    Format
                   </span>
-                  <span className="text-sm font-medium">{dataset.size}</span>
+                  <Badge variant={dataset.datasetFormat === "lerobot" ? "default" : "secondary"}>
+                    {dataset.datasetFormat === "lerobot" ? "LeRobot" : "Corobot"}
+                  </Badge>
                 </div>
                 <Separator />
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    Format
+                    <Bot className="h-4 w-4" />
+                    Robot
                   </span>
-                  <Badge variant="secondary">{dataset.format}</Badge>
+                  <span className="text-sm font-medium">{dataset.robotType}</span>
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground flex items-center gap-2">
+                    <Target className="h-4 w-4" />
+                    Task
+                  </span>
+                  <span className="text-sm font-medium">{dataset.taskType}</span>
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground flex items-center gap-2">
+                    <HardDrive className="h-4 w-4" />
+                    Size
+                  </span>
+                  <span className="text-sm font-medium">{dataset.size}</span>
                 </div>
                 <Separator />
                 <div className="flex items-center justify-between">
@@ -409,76 +590,75 @@ datasets-cli download embodied-datahub/${dataset.id}`;
                 <Separator />
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground flex items-center gap-2">
-                    <Database className="h-4 w-4" />
-                    Rows
+                    <Gauge className="h-4 w-4" />
+                    FPS
                   </span>
-                  <span className="text-sm font-medium">
-                    {formatNumber(dataset.rows || 0)}
-                  </span>
+                  <span className="text-sm font-medium">{dataset.fps}</span>
                 </div>
-                {dataset.language && (
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Updated
+                  </span>
+                  <span className="text-sm font-medium">{dataset.updatedAt}</span>
+                </div>
+                {dataset.environment && (
                   <>
                     <Separator />
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">
-                        Language
+                        Environment
                       </span>
-                      <span className="text-sm font-medium">
-                        {dataset.language}
+                      <span className="text-sm font-medium">{dataset.environment}</span>
+                    </div>
+                  </>
+                )}
+                {dataset.simulationFramework && (
+                  <>
+                    <Separator />
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">
+                        Simulator
                       </span>
+                      <span className="text-sm font-medium">{dataset.simulationFramework}</span>
                     </div>
                   </>
                 )}
               </CardContent>
             </Card>
 
-            {/* Data Splits */}
+            {/* Episode Stats */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Data Splits</CardTitle>
+                <CardTitle className="text-lg">Statistics</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {dataset.splits?.map((split) => (
-                    <div key={split.name}>
-                      <div className="flex items-center justify-between text-sm mb-1">
-                        <span className="capitalize">{split.name}</span>
-                        <span className="text-muted-foreground">
-                          {formatNumber(split.rows)}
-                        </span>
-                      </div>
-                      <div className="h-2 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-primary rounded-full"
-                          style={{
-                            width: `${(split.rows / (dataset.rows || 1)) * 100}%`,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Features */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Features</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {dataset.features?.map((feature) => (
-                    <div
-                      key={feature.name}
-                      className="flex items-center justify-between p-2 rounded bg-muted/50"
-                    >
-                      <code className="text-sm">{feature.name}</code>
-                      <Badge variant="outline" className="text-xs">
-                        {feature.type}
-                      </Badge>
-                    </div>
-                  ))}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Episodes</span>
+                    <span className="text-sm font-medium">{formatNumber(dataset.totalEpisodes)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Total Frames</span>
+                    <span className="text-sm font-medium">{formatNumber(dataset.totalFrames)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Avg. Episode Length</span>
+                    <span className="text-sm font-medium">
+                      {dataset.totalEpisodes > 0 
+                        ? Math.round(dataset.totalFrames / dataset.totalEpisodes) 
+                        : 0} frames
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Observations</span>
+                    <span className="text-sm font-medium">{dataset.observationTypes?.length || 0}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Action Dims</span>
+                    <span className="text-sm font-medium">{dataset.actionSpace?.dimensions || 0}</span>
+                  </div>
                 </div>
               </CardContent>
             </Card>

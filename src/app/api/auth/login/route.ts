@@ -12,10 +12,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const success = await login(username, password);
+    const token = await login(username, password);
 
-    if (success) {
-      return NextResponse.json({ success: true });
+    if (token) {
+      return NextResponse.json({ success: true, token });
     } else {
       return NextResponse.json(
         { error: "Invalid username or password" },

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Download, Heart, Calendar, Database } from "lucide-react";
+import { Download, Calendar, Film, Layers } from "lucide-react";
 import { Dataset } from "@/types/dataset";
 import { formatNumber } from "@/data/datasets";
 
@@ -31,8 +31,11 @@ export function DatasetCard({ dataset }: DatasetCardProps) {
                 </h3>
               </div>
             </div>
-            <Badge variant="secondary" className="flex-shrink-0 text-xs">
-              {dataset.task}
+            <Badge 
+              variant={dataset.datasetFormat === "lerobot" ? "default" : "secondary"} 
+              className="flex-shrink-0 text-xs"
+            >
+              {dataset.datasetFormat === "lerobot" ? "LeRobot" : "Corobot"}
             </Badge>
           </div>
         </CardHeader>
@@ -41,19 +44,29 @@ export function DatasetCard({ dataset }: DatasetCardProps) {
             {dataset.description}
           </p>
 
+          {/* Robot & Task */}
+          <div className="flex gap-1 mb-3">
+            <Badge variant="outline" className="text-xs px-2 py-0 h-5">
+              {dataset.robotType}
+            </Badge>
+            <Badge variant="outline" className="text-xs px-2 py-0 h-5">
+              {dataset.taskType}
+            </Badge>
+          </div>
+
           {/* Tags */}
           <div className="flex gap-1 mb-3">
             {dataset.tags.slice(0, 2).map((tag) => (
               <Badge
                 key={tag}
                 variant="outline"
-                className="text-xs px-2 py-0 h-5"
+                className="text-xs px-2 py-0 h-5 bg-muted/50"
               >
                 {tag}
               </Badge>
             ))}
             {dataset.tags.length > 2 && (
-              <Badge variant="outline" className="text-xs px-2 py-0 h-5 flex-shrink-0">
+              <Badge variant="outline" className="text-xs px-2 py-0 h-5 bg-muted/50 flex-shrink-0">
                 +{dataset.tags.length - 2}
               </Badge>
             )}
@@ -63,33 +76,26 @@ export function DatasetCard({ dataset }: DatasetCardProps) {
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <div className="flex items-center gap-3">
               <span className="flex items-center gap-1">
+                <Film className="h-3 w-3" />
+                {formatNumber(dataset.totalEpisodes)} eps
+              </span>
+              <span className="flex items-center gap-1">
+                <Layers className="h-3 w-3" />
+                {formatNumber(dataset.totalFrames)}
+              </span>
+              <span className="flex items-center gap-1">
                 <Download className="h-3 w-3" />
                 {formatNumber(dataset.downloads)}
               </span>
-              <span className="flex items-center gap-1">
-                <Heart className="h-3 w-3" />
-                {formatNumber(dataset.likes)}
-              </span>
-              {dataset.rows && (
-                <span className="flex items-center gap-1">
-                  <Database className="h-3 w-3" />
-                  {formatNumber(dataset.rows)}
-                </span>
-              )}
             </div>
+          </div>
+
+          {/* Size & Date */}
+          <div className="flex items-center justify-between mt-2 pt-2 border-t text-xs text-muted-foreground">
+            <span>{dataset.size}</span>
             <span className="flex items-center gap-1">
               <Calendar className="h-3 w-3" />
               {dataset.updatedAt}
-            </span>
-          </div>
-
-          {/* Format & Size */}
-          <div className="flex items-center gap-2 mt-2 pt-2 border-t">
-            <Badge variant="secondary" className="text-xs">
-              {dataset.format}
-            </Badge>
-            <span className="text-xs text-muted-foreground">
-              {dataset.size}
             </span>
           </div>
         </CardContent>

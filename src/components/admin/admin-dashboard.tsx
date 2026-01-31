@@ -22,6 +22,7 @@ import {
   Database,
   Home,
   Loader2,
+  Terminal,
 } from "lucide-react";
 import { Dataset } from "@/types/dataset";
 import { formatNumber } from "@/data/datasets";
@@ -95,6 +96,23 @@ export function AdminDashboard() {
     }
   };
 
+  // IMPORTANT: datasets list endpoint (/api/datasets) does not include files.
+  // When opening the edit dialog, fetch the full dataset (including files) so
+  // we don't accidentally submit an empty files array.
+  const openEditDialog = async (dataset: Dataset) => {
+    setEditingDataset(dataset);
+    setIsEditOpen(true);
+
+    try {
+      const res = await fetch(`/api/datasets/${dataset.id}`);
+      if (!res.ok) return;
+      const full = (await res.json()) as Dataset;
+      setEditingDataset((cur) => (cur?.id === dataset.id ? full : cur));
+    } catch (error) {
+      console.error("Failed to fetch dataset details:", error);
+    }
+  };
+
   const handleDelete = async (id: string) => {
     try {
       const res = await fetch(`/api/datasets/${id}`, {
@@ -111,7 +129,7 @@ export function AdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+    <div className="min-h-screen bg-linear-to-b from-background to-muted/20">
       {/* Header */}
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur">
         <div className="w-full flex h-14 items-center justify-between px-6">
@@ -143,6 +161,34 @@ export function AdminDashboard() {
 
       {/* Main Content */}
       <main className="container max-w-6xl mx-auto px-4 py-8">
+        {/* CLI Info Card */}
+        <Card className="mb-8 border-blue-200 bg-blue-50/50 dark:border-blue-900 dark:bg-blue-950/20">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-4">
+              <Terminal className="h-8 w-8 text-blue-600 dark:text-blue-400 shrink-0" />
+              <div>
+                <h3 className="font-semibold text-blue-900 dark:text-blue-100">
+                  使用 CLI 工具上传数据集
+                </h3>
+                <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                  数据集文件上传请使用命令行工具，支持保留完整目录结构和大文件上传：
+                </p>
+                <div className="mt-3 p-3 bg-slate-900 rounded-md font-mono text-sm text-slate-100">
+                  <p className="text-slate-400"># 安装 CLI 工具</p>
+                  <p>pip install -e ./cli</p>
+                  <p className="text-slate-400 mt-2"># 配置并登录</p>
+                  <p>datahub config api http://localhost:3000</p>
+                  <p>datahub config cos</p>
+                  <p>datahub login</p>
+                  <p className="text-slate-400 mt-2"># 创建并上传数据集</p>
+                  <p>datahub create &quot;My Dataset&quot; --author &quot;Your Name&quot;</p>
+                  <p>datahub upload my-dataset ./path/to/folder</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <Card>
@@ -170,12 +216,12 @@ export function AdminDashboard() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Rows
+                Total Frames
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">
-                {formatNumber(datasets.reduce((sum, d) => sum + (d.rows || 0), 0))}
+                {formatNumber(datasets.reduce((sum, d) => sum + (d.totalFrames || 0), 0))}
               </div>
             </CardContent>
           </Card>
@@ -188,20 +234,34 @@ export function AdminDashboard() {
               <Database className="h-5 w-5" />
               Datasets
             </CardTitle>
-            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Add Dataset
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Create New Dataset</DialogTitle>
-                </DialogHeader>
-                <DatasetForm onSubmit={handleCreate} />
-              </DialogContent>
-            </Dialog>
+            <div className="flex items-center gap-2">
+              {/* Create Dialog */}
+              <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Create Dataset
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0">
+                  <DialogHeader className="px-6 py-4 border-b shrink-0">
+                    <DialogTitle>Create New Dataset</DialogTitle>
+                  </DialogHeader>
+                  <div className="flex-1 overflow-y-auto px-6 py-4">
+                    <DatasetForm 
+                      onSubmit={handleCreate} 
+                      formId="create-dataset-form"
+                      hideSubmitButton
+                    />
+                  </div>
+                  <div className="px-6 py-4 border-t shrink-0 flex justify-end">
+                    <Button type="submit" form="create-dataset-form">
+                      Create Dataset
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -222,12 +282,14 @@ export function AdminDashboard() {
                     <div className="flex-1 min-w-0 mr-4">
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-medium truncate">{dataset.name}</h3>
-                        <Badge variant="secondary" className="text-xs">
-                          {dataset.task}
-                        </Badge>
+                        {dataset.taskType && (
+                          <Badge variant="secondary" className="text-xs">
+                            {dataset.taskType}
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-sm text-muted-foreground truncate">
-                        {dataset.author} • {dataset.size} •{" "}
+                        {dataset.author} • {dataset.size || "N/A"} •{" "}
                         {formatNumber(dataset.downloads)} downloads
                       </p>
                     </div>
@@ -243,21 +305,30 @@ export function AdminDashboard() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => setEditingDataset(dataset)}
+                            onClick={() => openEditDialog(dataset)}
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
                         </DialogTrigger>
-                        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                          <DialogHeader>
+                        <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0">
+                          <DialogHeader className="px-6 py-4 border-b shrink-0">
                             <DialogTitle>Edit Dataset</DialogTitle>
                           </DialogHeader>
-                          {editingDataset && (
-                            <DatasetForm
-                              dataset={editingDataset}
-                              onSubmit={handleUpdate}
-                            />
-                          )}
+                          <div className="flex-1 overflow-y-auto px-6 py-4">
+                            {editingDataset && (
+                              <DatasetForm
+                                dataset={editingDataset}
+                                onSubmit={handleUpdate}
+                                formId="edit-dataset-form"
+                                hideSubmitButton
+                              />
+                            )}
+                          </div>
+                          <div className="px-6 py-4 border-t shrink-0 flex justify-end">
+                            <Button type="submit" form="edit-dataset-form">
+                              Update Dataset
+                            </Button>
+                          </div>
                         </DialogContent>
                       </Dialog>
 
@@ -275,7 +346,7 @@ export function AdminDashboard() {
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </DialogTrigger>
-                        <DialogContent>
+                        <DialogContent className="sm:max-w-md">
                           <DialogHeader>
                             <DialogTitle>Delete Dataset</DialogTitle>
                           </DialogHeader>
